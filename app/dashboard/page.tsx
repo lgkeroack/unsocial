@@ -3,7 +3,7 @@
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useState, useEffect, useCallback, Suspense } from 'react';
 import { signIn, useSession, signOut } from 'next-auth/react';
-import { getPlatform, Platform } from '@/lib/platforms';
+import { getPlatform } from '@/lib/platforms';
 import Link from 'next/link';
 
 type Step = 'welcome' | 'auth' | 'data-selection' | 'backup' | 'download' | 'deletion' | 'complete';
@@ -26,18 +26,16 @@ function DashboardContent() {
   const [currentStep, setCurrentStep] = useState<Step>('welcome');
   const [selectedDataTypes, setSelectedDataTypes] = useState<string[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [backupJobId, setBackupJobId] = useState<string | null>(null);
+  const [, setBackupJobId] = useState<string | null>(null);
   const [backupProgress, setBackupProgress] = useState(0);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
 
-  // Initialize with all data types selected
   useEffect(() => {
     if (platform) {
       setSelectedDataTypes(platform.dataTypes.map(dt => dt.id));
     }
   }, [platform]);
 
-  // Check if user is authenticated after OAuth
   useEffect(() => {
     if (status === 'authenticated' && currentStep === 'auth') {
       setCurrentStep('data-selection');
@@ -75,11 +73,11 @@ function DashboardContent() {
 
   if (!platform) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className="min-h-screen flex items-center justify-center bg-cream">
         <div className="text-center">
-          <h2 className="text-2xl font-bold mb-4">Platform not found</h2>
-          <Link href="/" className="text-blue-600 hover:underline">
-            Return to home
+          <h2 className="font-serif text-2xl text-stone-800 mb-4">Platform not found</h2>
+          <Link href="/" className="font-serif text-terracotta hover:underline">
+            Return home
           </Link>
         </div>
       </div>
@@ -145,142 +143,119 @@ function DashboardContent() {
   };
 
   const steps: Step[] = ['welcome', 'auth', 'data-selection', 'backup', 'download', 'deletion', 'complete'];
+  const currentStepIndex = steps.indexOf(currentStep);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+    <div className="min-h-screen bg-cream flex flex-col">
       {/* Header */}
-      <header className="border-b bg-white/80 backdrop-blur-sm">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
-            <Link href="/" className="flex items-center space-x-3">
-              <div className="text-3xl">&#128682;</div>
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                unsocial.me
-              </h1>
-            </Link>
-            <div className="flex items-center space-x-3">
-              <div className={`text-4xl bg-gradient-to-br ${platform.color} w-14 h-14 rounded-xl flex items-center justify-center shadow-lg`}>
-                {platform.icon}
-              </div>
-              <span className="text-xl font-semibold">{platform.name}</span>
-            </div>
-          </div>
-        </div>
+      <header className="px-8 py-6 flex items-center justify-between">
+        <Link href="/" className="font-serif text-lg text-stone-700 hover:text-stone-900 transition-colors">
+          unsocial.me
+        </Link>
+        <span className="font-serif text-stone-500">
+          {platform.name}
+        </span>
       </header>
 
-      {/* Progress Indicator */}
-      <div className="bg-white border-b">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between max-w-4xl mx-auto">
-            {steps.map((step, index) => (
-              <div key={step} className="flex items-center">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-semibold text-sm ${
-                  currentStep === step ? 'bg-blue-600 text-white' :
-                  steps.indexOf(currentStep) > index ? 'bg-green-500 text-white' :
-                  'bg-slate-200 text-slate-500'
-                }`}>
-                  {steps.indexOf(currentStep) > index ? '✓' : index + 1}
-                </div>
-                {index < steps.length - 1 && <div className="w-8 md:w-12 h-0.5 bg-slate-200 mx-1 md:mx-2" />}
-              </div>
-            ))}
-          </div>
+      {/* Progress */}
+      <div className="px-8 py-4">
+        <div className="max-w-2xl mx-auto flex items-center justify-center space-x-2">
+          {steps.map((step, index) => (
+            <div key={step} className="flex items-center">
+              <div className={`w-2 h-2 rounded-full transition-colors ${
+                index <= currentStepIndex ? 'bg-stone-700' : 'bg-stone-300'
+              }`} />
+              {index < steps.length - 1 && (
+                <div className={`w-8 h-px mx-1 transition-colors ${
+                  index < currentStepIndex ? 'bg-stone-700' : 'bg-stone-300'
+                }`} />
+              )}
+            </div>
+          ))}
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="container mx-auto px-4 py-12">
-        <div className="max-w-3xl mx-auto">
+      <main className="flex-1 flex items-center justify-center px-8 py-12">
+        <div className="w-full max-w-xl">
 
           {/* Welcome Step */}
           {currentStep === 'welcome' && (
-            <div className="bg-white rounded-2xl shadow-lg p-8">
-              <h2 className="text-3xl font-bold mb-6">Welcome to Your {platform.name} Exit</h2>
-              <p className="text-lg text-slate-600 mb-8 leading-relaxed">
+            <div className="text-center">
+              <h2 className="font-serif text-3xl sm:text-4xl text-stone-800 mb-8">
+                Let's back up your {platform.name}
+              </h2>
+              <p className="font-serif text-lg text-stone-500 mb-12 leading-relaxed">
                 {platform.prompts.welcome}
               </p>
-
-              {platform.limitations.length > 0 && (
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-8">
-                  <h3 className="font-semibold text-amber-800 mb-2">Important Notes:</h3>
-                  <ul className="list-disc list-inside text-sm text-amber-700 space-y-1">
-                    {platform.limitations.map((limitation, i) => (
-                      <li key={i}>{limitation}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
               <button
                 onClick={() => setCurrentStep('auth')}
-                className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-8 py-4 rounded-lg font-semibold text-lg hover:shadow-lg transition-all w-full"
+                className="px-10 py-4 bg-stone-800 text-cream font-serif text-lg rounded-full hover:bg-stone-700 transition-colors"
               >
-                Let's Get Started
+                Continue
               </button>
             </div>
           )}
 
           {/* Auth Step */}
           {currentStep === 'auth' && (
-            <div className="bg-white rounded-2xl shadow-lg p-8">
-              <h2 className="text-3xl font-bold mb-6">Connect Your {platform.name} Account</h2>
-              <p className="text-lg text-slate-600 mb-8 leading-relaxed">
-                Click below to securely connect your account. You'll be redirected to {platform.name} to log in and authorize us to back up your data.
+            <div className="text-center">
+              <h2 className="font-serif text-3xl sm:text-4xl text-stone-800 mb-8">
+                Connect your account
+              </h2>
+              <p className="font-serif text-lg text-stone-500 mb-8 leading-relaxed">
+                You'll be redirected to {platform.name} to securely authorize access.
+                We never see your password.
               </p>
 
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-8">
-                <div className="flex items-start space-x-3">
-                  <div className="text-2xl">&#128274;</div>
-                  <div>
-                    <h3 className="font-semibold mb-2">Secure OAuth Authentication</h3>
-                    <p className="text-sm text-slate-600">
-                      We use official OAuth 2.0 authentication. We never see or store your password.
-                      You'll log in directly through {platform.name}'s secure interface.
-                    </p>
-                  </div>
-                </div>
+              <div className="bg-sand/50 rounded-2xl p-6 mb-10 text-left">
+                <p className="font-serif text-sm text-stone-600">
+                  We use OAuth 2.0, the same secure standard used by Google, Apple, and others.
+                  Your credentials stay with {platform.name}.
+                </p>
               </div>
 
               <button
                 onClick={handleAuth}
                 disabled={isProcessing || status === 'loading'}
-                className={`bg-gradient-to-br ${platform.color} text-white px-8 py-4 rounded-lg font-semibold text-lg hover:shadow-lg transition-all w-full ${
+                className={`px-10 py-4 bg-stone-800 text-cream font-serif text-lg rounded-full hover:bg-stone-700 transition-colors ${
                   isProcessing || status === 'loading' ? 'opacity-50 cursor-not-allowed' : ''
                 }`}
               >
-                {isProcessing || status === 'loading' ? platform.prompts.authInProgress : platform.prompts.authButton}
+                {isProcessing || status === 'loading' ? 'Connecting...' : `Connect ${platform.name}`}
               </button>
             </div>
           )}
 
           {/* Data Selection Step */}
           {currentStep === 'data-selection' && (
-            <div className="bg-white rounded-2xl shadow-lg p-8">
-              <h2 className="text-3xl font-bold mb-6">Select Data to Back Up</h2>
-              <p className="text-lg text-slate-600 mb-8 leading-relaxed">
-                {platform.prompts.dataSelection}
+            <div>
+              <h2 className="font-serif text-3xl sm:text-4xl text-stone-800 mb-8 text-center">
+                What to back up
+              </h2>
+              <p className="font-serif text-lg text-stone-500 mb-10 text-center leading-relaxed">
+                Select the data you want to preserve.
               </p>
 
-              <div className="space-y-3 mb-8">
+              <div className="space-y-3 mb-10">
                 {platform.dataTypes.map((dataType) => (
                   <label
                     key={dataType.id}
-                    className={`flex items-center p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                    className={`flex items-center p-4 rounded-xl border-2 cursor-pointer transition-all ${
                       selectedDataTypes.includes(dataType.id)
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-slate-200 hover:border-slate-300'
+                        ? 'border-stone-700 bg-sand/30'
+                        : 'border-stone-200 hover:border-stone-300'
                     }`}
                   >
                     <input
                       type="checkbox"
                       checked={selectedDataTypes.includes(dataType.id)}
                       onChange={() => toggleDataType(dataType.id)}
-                      className="w-5 h-5 text-blue-600 rounded mr-4"
+                      className="w-4 h-4 rounded border-stone-300 text-stone-800 focus:ring-stone-500 mr-4"
                     />
-                    <div className="text-2xl mr-4">{dataType.icon}</div>
                     <div>
-                      <div className="font-semibold">{dataType.name}</div>
-                      <div className="text-sm text-slate-500">{dataType.description}</div>
+                      <div className="font-serif text-stone-800">{dataType.name}</div>
+                      <div className="font-serif text-sm text-stone-500">{dataType.description}</div>
                     </div>
                   </label>
                 ))}
@@ -289,137 +264,133 @@ function DashboardContent() {
               <button
                 onClick={handleStartBackup}
                 disabled={selectedDataTypes.length === 0}
-                className={`bg-gradient-to-r from-blue-600 to-purple-600 text-white px-8 py-4 rounded-lg font-semibold text-lg hover:shadow-lg transition-all w-full ${
+                className={`w-full px-10 py-4 bg-stone-800 text-cream font-serif text-lg rounded-full hover:bg-stone-700 transition-colors ${
                   selectedDataTypes.length === 0 ? 'opacity-50 cursor-not-allowed' : ''
                 }`}
               >
-                Start Backup ({selectedDataTypes.length} types selected)
+                Start backup
               </button>
             </div>
           )}
 
           {/* Backup Step */}
           {currentStep === 'backup' && (
-            <div className="bg-white rounded-2xl shadow-lg p-8 text-center">
-              <div className="text-6xl mb-6">&#128230;</div>
-              <h2 className="text-3xl font-bold mb-4">Backing Up Your Data</h2>
-              <p className="text-lg text-slate-600 mb-8">
-                {platform.prompts.backupProgress}
+            <div className="text-center">
+              <h2 className="font-serif text-3xl sm:text-4xl text-stone-800 mb-8">
+                Backing up...
+              </h2>
+              <p className="font-serif text-lg text-stone-500 mb-10">
+                This may take a few minutes.
               </p>
 
-              <div className="w-full bg-slate-200 rounded-full h-4 mb-4">
+              <div className="w-full bg-sand rounded-full h-2 mb-4">
                 <div
-                  className="bg-gradient-to-r from-blue-600 to-purple-600 h-4 rounded-full transition-all duration-500"
+                  className="bg-stone-700 h-2 rounded-full transition-all duration-500"
                   style={{ width: `${backupProgress}%` }}
                 />
               </div>
-              <p className="text-slate-500">{backupProgress}% complete</p>
+              <p className="font-serif text-stone-500">{backupProgress}%</p>
             </div>
           )}
 
           {/* Download Step */}
           {currentStep === 'download' && (
-            <div className="bg-white rounded-2xl shadow-lg p-8">
-              <div className="text-center mb-8">
-                <div className="text-6xl mb-4">&#127881;</div>
-                <h2 className="text-3xl font-bold mb-4">{platform.prompts.backupComplete}</h2>
-                <p className="text-lg text-slate-600">
-                  {platform.prompts.downloadReady}
-                </p>
-              </div>
+            <div className="text-center">
+              <h2 className="font-serif text-3xl sm:text-4xl text-stone-800 mb-8">
+                Your backup is ready
+              </h2>
+              <p className="font-serif text-lg text-stone-500 mb-10 leading-relaxed">
+                Download your archive and store it somewhere safe.
+              </p>
 
               {downloadUrl && (
                 <a
                   href={downloadUrl}
-                  className="block bg-gradient-to-r from-green-500 to-emerald-600 text-white px-8 py-4 rounded-lg font-semibold text-lg hover:shadow-lg transition-all text-center mb-6"
+                  className="inline-block px-10 py-4 bg-stone-800 text-cream font-serif text-lg rounded-full hover:bg-stone-700 transition-colors mb-6"
                 >
-                  &#128229; Download Your Archive
+                  Download archive
                 </a>
               )}
 
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
-                <p className="text-amber-800 text-sm">
-                  <strong>Important:</strong> Your backup will be available for 7 days. Download it now and store it safely.
+              <div className="bg-sand/50 rounded-2xl p-6 mb-10">
+                <p className="font-serif text-sm text-stone-600">
+                  This link expires in 7 days. Make sure to download before then.
                 </p>
               </div>
 
               <button
                 onClick={handleProceedToDeletion}
-                className="w-full border-2 border-slate-300 text-slate-700 px-8 py-4 rounded-lg font-semibold hover:bg-slate-50 transition-all"
+                className="font-serif text-stone-500 hover:text-stone-700 underline underline-offset-4 transition-colors"
               >
-                Proceed to Account Deletion Guide
+                Continue to deletion guide
               </button>
             </div>
           )}
 
           {/* Deletion Step */}
           {currentStep === 'deletion' && (
-            <div className="bg-white rounded-2xl shadow-lg p-8">
-              <h2 className="text-3xl font-bold mb-6">Delete Your {platform.name} Account</h2>
+            <div className="text-center">
+              <h2 className="font-serif text-3xl sm:text-4xl text-stone-800 mb-8">
+                Ready to delete?
+              </h2>
 
-              <div className="bg-red-50 border border-red-200 rounded-lg p-6 mb-8">
-                <div className="flex items-start space-x-3">
-                  <div className="text-2xl">&#9888;&#65039;</div>
-                  <div>
-                    <h3 className="font-semibold text-red-800 mb-2">Warning</h3>
-                    <p className="text-sm text-red-700">
-                      {platform.prompts.deletionWarning}
-                    </p>
-                  </div>
-                </div>
+              <div className="bg-sand/50 rounded-2xl p-6 mb-10 text-left">
+                <p className="font-serif text-sm text-stone-600 mb-4">
+                  {platform.prompts.deletionWarning}
+                </p>
+                <ol className="font-serif text-sm text-stone-600 space-y-2 list-decimal list-inside">
+                  {platform.deletionSteps.map((step, i) => (
+                    <li key={i}>{step}</li>
+                  ))}
+                </ol>
               </div>
-
-              <h3 className="font-semibold text-lg mb-4">Steps to Delete Your Account:</h3>
-              <ol className="list-decimal list-inside space-y-3 mb-8 text-slate-700">
-                {platform.deletionSteps.map((step, i) => (
-                  <li key={i} className="pl-2">{step}</li>
-                ))}
-              </ol>
 
               <button
                 onClick={handleOpenDeletionPage}
-                className="w-full bg-red-600 text-white px-8 py-4 rounded-lg font-semibold text-lg hover:bg-red-700 transition-all mb-4"
+                className="px-10 py-4 bg-terracotta text-cream font-serif text-lg rounded-full hover:bg-terracotta/90 transition-colors mb-4"
               >
-                Open {platform.name} Account Deletion Page
+                Open {platform.name} deletion page
               </button>
 
-              <button
-                onClick={handleConfirmDeletion}
-                className="w-full border-2 border-slate-300 text-slate-700 px-8 py-4 rounded-lg font-semibold hover:bg-slate-50 transition-all"
-              >
-                I've Deleted My Account (or Skip This Step)
-              </button>
+              <div>
+                <button
+                  onClick={handleConfirmDeletion}
+                  className="font-serif text-stone-500 hover:text-stone-700 underline underline-offset-4 transition-colors"
+                >
+                  I'm done, or skip this step
+                </button>
+              </div>
             </div>
           )}
 
           {/* Complete Step */}
           {currentStep === 'complete' && (
-            <div className="bg-white rounded-2xl shadow-lg p-8 text-center">
-              <div className="text-6xl mb-6">&#127881;</div>
-              <h2 className="text-3xl font-bold mb-4">Congratulations!</h2>
-              <p className="text-lg text-slate-600 mb-8 leading-relaxed">
-                {platform.prompts.complete}
+            <div className="text-center">
+              <h2 className="font-serif text-3xl sm:text-4xl text-stone-800 mb-8">
+                You're all set
+              </h2>
+              <p className="font-serif text-lg text-stone-500 mb-10 leading-relaxed">
+                Your memories are safe. Take care.
               </p>
-
-              <div className="bg-green-50 border border-green-200 rounded-lg p-6 mb-8">
-                <h3 className="font-semibold text-green-800 mb-2">Your Data is Safe</h3>
-                <p className="text-sm text-green-700">
-                  Make sure you've downloaded your backup archive and stored it in a safe place.
-                  Your memories will be preserved in standard formats you can access anytime.
-                </p>
-              </div>
 
               <Link
                 href="/"
-                className="inline-block bg-gradient-to-r from-blue-600 to-purple-600 text-white px-8 py-4 rounded-lg font-semibold text-lg hover:shadow-lg transition-all"
+                className="inline-block px-10 py-4 bg-stone-800 text-cream font-serif text-lg rounded-full hover:bg-stone-700 transition-colors"
               >
-                Back Up Another Platform
+                Back to home
               </Link>
             </div>
           )}
 
         </div>
-      </div>
+      </main>
+
+      {/* Footer */}
+      <footer className="px-8 py-6 text-center">
+        <p className="font-serif text-sm text-stone-400">
+          Your data, your choice.
+        </p>
+      </footer>
     </div>
   );
 }
@@ -427,11 +398,8 @@ function DashboardContent() {
 export default function Dashboard() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="text-center">
-          <div className="text-4xl mb-4">&#128260;</div>
-          <p className="text-slate-600">Loading...</p>
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-cream">
+        <p className="font-serif text-stone-500">Loading...</p>
       </div>
     }>
       <DashboardContent />

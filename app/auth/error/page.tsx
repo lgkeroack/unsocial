@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 
 function AuthErrorContent() {
@@ -25,35 +25,50 @@ function AuthErrorContent() {
   const message = error ? errorMessages[error] || errorMessages.Default : errorMessages.Default;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center px-4">
-      <div className="max-w-md w-full bg-white rounded-2xl shadow-lg p-8 text-center">
-        <div className="text-6xl mb-6">&#9888;&#65039;</div>
-        <h1 className="text-2xl font-bold mb-4">Authentication Error</h1>
-        <p className="text-slate-600 mb-8">{message}</p>
+    <div className="min-h-screen bg-cream flex flex-col">
+      <header className="px-8 py-6">
+        <Link href="/" className="font-serif text-lg text-stone-700 hover:text-stone-900 transition-colors">
+          unsocial.me
+        </Link>
+      </header>
 
-        {error && (
-          <div className="bg-slate-100 rounded-lg p-4 mb-8">
-            <p className="text-sm text-slate-500">
-              Error code: <code className="font-mono">{error}</code>
-            </p>
+      <main className="flex-1 flex items-center justify-center px-8">
+        <div className="max-w-md w-full text-center">
+          <h1 className="font-serif text-3xl text-stone-800 mb-6">Something went wrong</h1>
+          <p className="font-serif text-lg text-stone-500 mb-8">{message}</p>
+
+          {error && (
+            <div className="bg-sand/50 rounded-2xl p-4 mb-10">
+              <p className="font-serif text-sm text-stone-500">
+                Error: {error}
+              </p>
+            </div>
+          )}
+
+          <div className="space-y-4">
+            <Link
+              href="/"
+              className="inline-block px-10 py-4 bg-stone-800 text-cream font-serif text-lg rounded-full hover:bg-stone-700 transition-colors"
+            >
+              Return home
+            </Link>
+            <div>
+              <button
+                onClick={() => window.history.back()}
+                className="font-serif text-stone-500 hover:text-stone-700 underline underline-offset-4 transition-colors"
+              >
+                Go back
+              </button>
+            </div>
           </div>
-        )}
-
-        <div className="space-y-3">
-          <Link
-            href="/"
-            className="block bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg transition-all"
-          >
-            Return Home
-          </Link>
-          <button
-            onClick={() => window.history.back()}
-            className="block w-full border-2 border-slate-300 text-slate-700 px-6 py-3 rounded-lg font-semibold hover:bg-slate-50 transition-all"
-          >
-            Go Back
-          </button>
         </div>
-      </div>
+      </main>
+
+      <footer className="px-8 py-6 text-center">
+        <p className="font-serif text-sm text-stone-400">
+          Your data, your choice.
+        </p>
+      </footer>
     </div>
   );
 }
@@ -61,11 +76,8 @@ function AuthErrorContent() {
 export default function AuthError() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="text-center">
-          <div className="text-4xl mb-4">&#128260;</div>
-          <p className="text-slate-600">Loading...</p>
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-cream">
+        <p className="font-serif text-stone-500">Loading...</p>
       </div>
     }>
       <AuthErrorContent />

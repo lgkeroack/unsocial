@@ -21,8 +21,18 @@ module.exports = {
           'Helvetica Neue',
           'sans-serif',
         ],
+        serif: [
+          'Georgia',
+          'Cambria',
+          'Times New Roman',
+          'Times',
+          'serif',
+        ],
       },
       colors: {
+        cream: '#FAF7F2',
+        terracotta: '#C4795B',
+        sand: '#E8E2D9',
         border: 'hsl(var(--border))',
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
