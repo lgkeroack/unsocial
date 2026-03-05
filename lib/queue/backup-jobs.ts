@@ -4,8 +4,7 @@ import { FacebookAPI, createFacebookArchive } from '@/lib/api/facebook';
 import { LinkedInAPI, createLinkedInArchive } from '@/lib/api/linkedin';
 import { uploadArchive } from '@/lib/storage/archives';
 import { sendBackupCompleteEmail } from '@/lib/email/notifications';
-
-type PlatformType = 'instagram' | 'facebook' | 'linkedin';
+import { PlatformType } from '@/lib/constants';
 
 interface BackupJobData {
   userId: string;
