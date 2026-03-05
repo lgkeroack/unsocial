@@ -1,7 +1,7 @@
 'use client';
 
 import { useSearchParams, useRouter } from 'next/navigation';
-import { useState, useEffect, useCallback, Suspense } from 'react';
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { signIn, useSession, signOut } from 'next-auth/react';
 import { getPlatform } from '@/lib/platforms';
 import Link from 'next/link';
@@ -26,9 +26,9 @@ function DashboardContent() {
   const [currentStep, setCurrentStep] = useState<Step>('welcome');
   const [selectedDataTypes, setSelectedDataTypes] = useState<string[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [, setBackupJobId] = useState<string | null>(null);
   const [backupProgress, setBackupProgress] = useState(0);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  const pollCleanupRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     if (platform) {
@@ -42,7 +42,7 @@ function DashboardContent() {
     }
   }, [status, currentStep]);
 
-  const pollBackupStatus = useCallback(async (jobId: string) => {
+  const pollBackupStatus = useCallback((jobId: string) => {
     const pollInterval = setInterval(async () => {
       try {
         const response = await fetch(`/api/backup/status/${jobId}`);
@@ -55,11 +55,13 @@ function DashboardContent() {
 
         if (statusData.state === 'completed' && statusData.result) {
           clearInterval(pollInterval);
+          pollCleanupRef.current = null;
           setIsProcessing(false);
           setDownloadUrl(`/api/download/${statusData.result.archiveId}`);
           setCurrentStep('download');
         } else if (statusData.state === 'failed') {
           clearInterval(pollInterval);
+          pollCleanupRef.current = null;
           setIsProcessing(false);
           alert('Backup failed. Please try again.');
         }
@@ -68,7 +70,13 @@ function DashboardContent() {
       }
     }, 2000);
 
-    return () => clearInterval(pollInterval);
+    pollCleanupRef.current = () => clearInterval(pollInterval);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      pollCleanupRef.current?.();
+    };
   }, []);
 
   if (!platform) {
@@ -116,7 +124,6 @@ function DashboardContent() {
       const data = await response.json();
 
       if (data.success && data.jobId) {
-        setBackupJobId(data.jobId);
         pollBackupStatus(data.jobId);
       } else {
         throw new Error(data.error || 'Backup failed to start');
