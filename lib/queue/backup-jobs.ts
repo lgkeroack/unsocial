@@ -29,7 +29,6 @@ interface JobStatus {
   userId: string;
 }
 
-// Create queue - handle missing Redis gracefully
 let backupQueue: Queue.Queue<BackupJobData> | null = null;
 
 function getBackupQueue(): Queue.Queue<BackupJobData> {
@@ -50,7 +49,6 @@ function getBackupQueue(): Queue.Queue<BackupJobData> {
       }
     });
 
-    // Set up job processor
     backupQueue.process(processBackupJob);
   }
   return backupQueue;

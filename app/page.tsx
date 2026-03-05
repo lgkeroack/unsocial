@@ -42,7 +42,6 @@ export default function Home() {
                 {selectedPlatform.name}
               </button>
 
-              {/* Dropdown */}
               {isDropdownOpen && (
                 <div className="absolute top-full left-1/2 -translate-x-1/2 mt-4 bg-white rounded-lg shadow-xl border border-stone-200 py-2 min-w-[200px] z-50">
                   {platforms.map((platform) => (

@@ -4,22 +4,29 @@ import { randomUUID } from 'crypto';
 import { PlatformType, PLATFORMS, isValidUUID, sanitizeId } from '@/lib/constants';
 
 function getS3Client(): S3Client {
-  const endpoint = process.env.STORAGE_ENDPOINT;
   const accessKeyId = process.env.STORAGE_ACCESS_KEY;
   const secretAccessKey = process.env.STORAGE_SECRET_KEY;
+  const region = process.env.STORAGE_REGION || 'us-east-1';
+  const endpoint = process.env.STORAGE_ENDPOINT;
 
-  if (!endpoint || !accessKeyId || !secretAccessKey) {
-    throw new Error('Storage configuration is incomplete. Check STORAGE_ENDPOINT, STORAGE_ACCESS_KEY, and STORAGE_SECRET_KEY.');
+  if (!accessKeyId || !secretAccessKey) {
+    throw new Error('Storage configuration is incomplete. Check STORAGE_ACCESS_KEY and STORAGE_SECRET_KEY.');
   }
 
-  return new S3Client({
-    endpoint,
-    region: 'auto',
+  const config: ConstructorParameters<typeof S3Client>[0] = {
+    region,
     credentials: {
       accessKeyId,
       secretAccessKey
     }
-  });
+  };
+
+  // Custom endpoint for R2 or other S3-compatible services
+  if (endpoint) {
+    config.endpoint = endpoint;
+  }
+
+  return new S3Client(config);
 }
 
 export async function uploadArchive(
