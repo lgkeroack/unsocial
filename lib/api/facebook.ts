@@ -360,6 +360,30 @@ export class FacebookAPI {
           case 'videos':
             if (onProgress) onProgress(currentProgress, 'Fetching videos...');
             backup.videos = await this.getUserVideos();
+
+            // Download actual video files
+            for (let i = 0; i < backup.videos.length; i++) {
+              const video = backup.videos[i] as { id?: string; source?: string };
+              try {
+                if (video.source) {
+                  const fileData = await this.downloadMedia(video.source);
+                  const safeId = (video.id || String(i)).replace(/[^a-zA-Z0-9_-]/g, '');
+                  backup.downloadedFiles.push({
+                    id: video.id || String(i),
+                    type: 'video',
+                    filename: `video_${safeId}.mp4`,
+                    data: fileData
+                  });
+                }
+              } catch (error) {
+                console.error(`Failed to download video ${video.id}:`, error);
+              }
+
+              if (onProgress && backup.videos.length > 0) {
+                const videoProgress = currentProgress + (progressPerType * (i + 1) / backup.videos.length * 0.5);
+                onProgress(videoProgress, `Downloading video ${i + 1} of ${backup.videos.length}...`);
+              }
+            }
             break;
 
           case 'friends':
@@ -467,6 +491,7 @@ Name: ${backup.profile?.name || 'Unknown'}
 - photo_albums.json: Your photo albums
 - photos/: Downloaded photos
 - videos.json: Video metadata
+- videos/: Downloaded video files
 - friends.json: Your friends list
 - groups.json: Groups you're in
 - events.json: Events you've attended or created

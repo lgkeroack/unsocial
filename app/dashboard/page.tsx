@@ -3,7 +3,7 @@
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { signIn, useSession, signOut } from 'next-auth/react';
-import { getPlatform } from '@/lib/platforms';
+import { getPlatform, LimitationBanner } from '@/lib/platforms';
 import Link from 'next/link';
 
 type Step = 'welcome' | 'auth' | 'data-selection' | 'backup' | 'download' | 'deletion' | 'complete';
@@ -14,6 +14,86 @@ interface BackupStatus {
   result?: {
     archiveId: string;
   };
+}
+
+interface ErrorInfo {
+  code: string;
+  message: string;
+  suggestion: string;
+}
+
+interface BackupArchive {
+  id: string;
+  expiresAt: string;
+  downloadCount: number;
+  expired: boolean;
+}
+
+interface BackupHistoryItem {
+  id: string;
+  platform: string;
+  status: string;
+  progress: number;
+  dataTypes: string[];
+  errorMessage: string | null;
+  createdAt: string;
+  archive: BackupArchive | null;
+}
+
+function ErrorBanner({ error, onDismiss }: { error: ErrorInfo; onDismiss: () => void }) {
+  return (
+    <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="font-serif text-stone-800 text-sm font-medium">{error.message}</p>
+          <p className="font-serif text-stone-500 text-sm mt-1">{error.suggestion}</p>
+        </div>
+        <button
+          onClick={onDismiss}
+          className="font-serif text-stone-400 hover:text-stone-600 text-lg leading-none ml-4"
+          aria-label="Dismiss error"
+        >
+          &times;
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function LimitationBannerDisplay({ banner }: { banner: LimitationBanner }) {
+  const bgColor = banner.severity === 'warning' ? 'bg-amber-50 border-amber-200' : 'bg-blue-50 border-blue-200';
+  const textColor = banner.severity === 'warning' ? 'text-amber-800' : 'text-blue-800';
+
+  return (
+    <div className={`${bgColor} border rounded-lg p-3 mt-2 ml-8`}>
+      <p className={`font-serif text-xs ${textColor}`}>{banner.message}</p>
+      {banner.officialToolUrl && banner.officialToolName && (
+        <a
+          href={banner.officialToolUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`font-serif text-xs ${textColor} underline underline-offset-2 mt-1 inline-block`}
+        >
+          {banner.officialToolName} &rarr;
+        </a>
+      )}
+    </div>
+  );
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const colors: Record<string, string> = {
+    queued: 'text-stone-500',
+    active: 'text-blue-600',
+    completed: 'text-green-600',
+    failed: 'text-red-600',
+  };
+
+  return (
+    <span className={`font-serif text-xs font-medium ${colors[status] || 'text-stone-500'}`}>
+      {status}
+    </span>
+  );
 }
 
 function DashboardContent() {
@@ -28,6 +108,9 @@ function DashboardContent() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [backupProgress, setBackupProgress] = useState(0);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  const [errorInfo, setErrorInfo] = useState<ErrorInfo | null>(null);
+  const [backupHistory, setBackupHistory] = useState<BackupHistoryItem[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
   const pollCleanupRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
@@ -42,11 +125,27 @@ function DashboardContent() {
     }
   }, [status, currentStep]);
 
+  // Fetch backup history
+  useEffect(() => {
+    if (status === 'authenticated') {
+      fetch('/api/backups')
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+          if (data?.backups) setBackupHistory(data.backups);
+        })
+        .catch(() => {});
+    }
+  }, [status]);
+
   const pollBackupStatus = useCallback((jobId: string) => {
     const pollInterval = setInterval(async () => {
       try {
         const response = await fetch(`/api/backup/status/${jobId}`);
         if (!response.ok) {
+          const data = await response.json().catch(() => null);
+          if (data?.error) {
+            throw new Error(data.error.message || 'Failed to fetch status');
+          }
           throw new Error('Failed to fetch status');
         }
 
@@ -63,7 +162,12 @@ function DashboardContent() {
           clearInterval(pollInterval);
           pollCleanupRef.current = null;
           setIsProcessing(false);
-          alert('Backup failed. Please try again.');
+          setErrorInfo({
+            code: 'BACKUP_START_FAILED',
+            message: 'Backup failed. Please try again.',
+            suggestion: 'If the problem persists, try reconnecting your account.',
+          });
+          setCurrentStep('data-selection');
         }
       } catch (error) {
         console.error('Status poll error:', error);
@@ -110,6 +214,7 @@ function DashboardContent() {
     setCurrentStep('backup');
     setIsProcessing(true);
     setBackupProgress(0);
+    setErrorInfo(null);
 
     try {
       const response = await fetch('/api/backup/start', {
@@ -126,13 +231,78 @@ function DashboardContent() {
       if (data.success && data.jobId) {
         pollBackupStatus(data.jobId);
       } else {
-        throw new Error(data.error || 'Backup failed to start');
+        const errData = data.error || data;
+        throw { code: errData.code, message: errData.message, suggestion: errData.suggestion };
       }
     } catch (error) {
       console.error('Backup error:', error);
       setIsProcessing(false);
-      alert('Failed to start backup. Please try again.');
+      if (error && typeof error === 'object' && 'code' in error) {
+        setErrorInfo(error as ErrorInfo);
+      } else {
+        setErrorInfo({
+          code: 'BACKUP_START_FAILED',
+          message: 'Failed to start backup. Please try again.',
+          suggestion: 'Check your connection and try again.',
+        });
+      }
       setCurrentStep('data-selection');
+    }
+  };
+
+  const handleRetry = async (jobId: string) => {
+    setErrorInfo(null);
+    try {
+      const response = await fetch(`/api/backup/${jobId}/retry`, { method: 'POST' });
+      const data = await response.json();
+
+      if (data.success && data.jobId) {
+        setCurrentStep('backup');
+        setIsProcessing(true);
+        setBackupProgress(0);
+        pollBackupStatus(data.jobId);
+      } else {
+        const errData = data.error || data;
+        setErrorInfo({
+          code: errData.code || 'BACKUP_START_FAILED',
+          message: errData.message || 'Retry failed',
+          suggestion: errData.suggestion || 'Please try again.',
+        });
+      }
+    } catch {
+      setErrorInfo({
+        code: 'BACKUP_START_FAILED',
+        message: 'Failed to retry backup.',
+        suggestion: 'Check your connection and try again.',
+      });
+    }
+  };
+
+  const handleResendEmail = async (archiveId: string) => {
+    try {
+      const response = await fetch(`/api/download/${archiveId}/resend-email`, { method: 'POST' });
+      const data = await response.json();
+
+      if (data.success) {
+        setErrorInfo({
+          code: 'SUCCESS',
+          message: 'Email sent successfully!',
+          suggestion: 'Check your inbox for the download link.',
+        });
+      } else {
+        const errData = data.error || data;
+        setErrorInfo({
+          code: errData.code || 'INTERNAL_ERROR',
+          message: errData.message || 'Failed to resend email',
+          suggestion: errData.suggestion || 'Please try again.',
+        });
+      }
+    } catch {
+      setErrorInfo({
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to resend email.',
+        suggestion: 'Check your connection and try again.',
+      });
     }
   };
 
@@ -185,6 +355,11 @@ function DashboardContent() {
       {/* Main Content */}
       <main className="flex-1 flex items-center justify-center px-8 py-12">
         <div className="w-full max-w-xl">
+
+          {/* Error Banner */}
+          {errorInfo && (
+            <ErrorBanner error={errorInfo} onDismiss={() => setErrorInfo(null)} />
+          )}
 
           {/* Welcome Step */}
           {currentStep === 'welcome' && (
@@ -245,27 +420,34 @@ function DashboardContent() {
               </p>
 
               <div className="space-y-3 mb-10">
-                {platform.dataTypes.map((dataType) => (
-                  <label
-                    key={dataType.id}
-                    className={`flex items-center p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                      selectedDataTypes.includes(dataType.id)
-                        ? 'border-stone-700 bg-sand/30'
-                        : 'border-stone-200 hover:border-stone-300'
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedDataTypes.includes(dataType.id)}
-                      onChange={() => toggleDataType(dataType.id)}
-                      className="w-4 h-4 rounded border-stone-300 text-stone-800 focus:ring-stone-500 mr-4"
-                    />
-                    <div>
-                      <div className="font-serif text-stone-800">{dataType.name}</div>
-                      <div className="font-serif text-sm text-stone-500">{dataType.description}</div>
+                {platform.dataTypes.map((dataType) => {
+                  const banners = platform.limitationBanners.filter(b => b.dataTypeId === dataType.id);
+                  return (
+                    <div key={dataType.id}>
+                      <label
+                        className={`flex items-center p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                          selectedDataTypes.includes(dataType.id)
+                            ? 'border-stone-700 bg-sand/30'
+                            : 'border-stone-200 hover:border-stone-300'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedDataTypes.includes(dataType.id)}
+                          onChange={() => toggleDataType(dataType.id)}
+                          className="w-4 h-4 rounded border-stone-300 text-stone-800 focus:ring-stone-500 mr-4"
+                        />
+                        <div>
+                          <div className="font-serif text-stone-800">{dataType.name}</div>
+                          <div className="font-serif text-sm text-stone-500">{dataType.description}</div>
+                        </div>
+                      </label>
+                      {selectedDataTypes.includes(dataType.id) && banners.map((banner, idx) => (
+                        <LimitationBannerDisplay key={idx} banner={banner} />
+                      ))}
                     </div>
-                  </label>
-                ))}
+                  );
+                })}
               </div>
 
               <button
@@ -386,6 +568,66 @@ function DashboardContent() {
               >
                 Back to home
               </Link>
+            </div>
+          )}
+
+          {/* Backup History */}
+          {status === 'authenticated' && backupHistory.length > 0 && (
+            <div className="mt-16 border-t border-stone-200 pt-8">
+              <button
+                onClick={() => setShowHistory(!showHistory)}
+                className="font-serif text-stone-500 hover:text-stone-700 text-sm underline underline-offset-4 transition-colors"
+              >
+                {showHistory ? 'Hide' : 'Show'} backup history ({backupHistory.length})
+              </button>
+
+              {showHistory && (
+                <div className="mt-4 space-y-3">
+                  {backupHistory.map((item) => (
+                    <div key={item.id} className="bg-sand/30 rounded-xl p-4 border border-stone-200">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-serif text-stone-800 text-sm capitalize">{item.platform}</span>
+                        <StatusBadge status={item.status} />
+                      </div>
+                      <p className="font-serif text-xs text-stone-400 mb-2">
+                        {new Date(item.createdAt).toLocaleString()}
+                      </p>
+                      {item.errorMessage && (
+                        <p className="font-serif text-xs text-red-500 mb-2">{item.errorMessage}</p>
+                      )}
+                      <div className="flex gap-3">
+                        {item.archive && !item.archive.expired && (
+                          <a
+                            href={`/api/download/${item.archive.id}`}
+                            className="font-serif text-xs text-stone-600 hover:text-stone-800 underline underline-offset-2"
+                          >
+                            Download
+                          </a>
+                        )}
+                        {item.archive && !item.archive.expired && (
+                          <button
+                            onClick={() => handleResendEmail(item.archive!.id)}
+                            className="font-serif text-xs text-stone-600 hover:text-stone-800 underline underline-offset-2"
+                          >
+                            Resend email
+                          </button>
+                        )}
+                        {item.status === 'failed' && (
+                          <button
+                            onClick={() => handleRetry(item.id)}
+                            className="font-serif text-xs text-terracotta hover:text-terracotta/80 underline underline-offset-2"
+                          >
+                            Retry
+                          </button>
+                        )}
+                        {item.archive?.expired && (
+                          <span className="font-serif text-xs text-stone-400">Expired</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

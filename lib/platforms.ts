@@ -5,6 +5,14 @@ export interface DataType {
   icon: string;
 }
 
+export interface LimitationBanner {
+  dataTypeId: string;
+  severity: 'info' | 'warning';
+  message: string;
+  officialToolUrl?: string;
+  officialToolName?: string;
+}
+
 export interface Platform {
   id: string;
   name: string;
@@ -13,6 +21,7 @@ export interface Platform {
   description: string;
   deletionURL: string;
   dataTypes: DataType[];
+  limitationBanners: LimitationBanner[];
   prompts: {
     welcome: string;
     authButton: string;
@@ -45,6 +54,27 @@ const platforms: Platform[] = [
       { id: 'reels', name: 'Reels', description: 'Your short-form videos', icon: '🎬' },
       { id: 'messages', name: 'Direct Messages', description: 'Your private conversations', icon: '💬' },
       { id: 'followers', name: 'Followers & Following', description: 'Your social connections', icon: '👥' },
+    ],
+    limitationBanners: [
+      {
+        dataTypeId: 'messages',
+        severity: 'warning',
+        message: 'Direct messages are not available through the Instagram API. Use the official data download tool to get your DMs.',
+        officialToolUrl: 'https://www.instagram.com/download/request/',
+        officialToolName: 'Instagram Data Download',
+      },
+      {
+        dataTypeId: 'followers',
+        severity: 'warning',
+        message: 'Follower/following lists require an Instagram Business or Creator account.',
+      },
+      {
+        dataTypeId: 'stories',
+        severity: 'info',
+        message: 'Only stories saved to highlights are available via API. For expired stories, use the official download tool.',
+        officialToolUrl: 'https://www.instagram.com/download/request/',
+        officialToolName: 'Instagram Data Download',
+      },
     ],
     prompts: {
       welcome: "We'll help you safely back up all your Instagram memories before you go. Your photos, videos, stories, and messages - everything will be preserved in standard formats you can keep forever.",
@@ -89,6 +119,15 @@ const platforms: Platform[] = [
       { id: 'groups', name: 'Groups', description: 'Groups you are a member of', icon: '👥' },
       { id: 'events', name: 'Events', description: 'Events you have attended or created', icon: '📅' },
     ],
+    limitationBanners: [
+      {
+        dataTypeId: 'messages',
+        severity: 'warning',
+        message: 'Messenger group chat data may be incomplete. For full message history, use Facebook\'s official download tool.',
+        officialToolUrl: 'https://www.facebook.com/dyi/',
+        officialToolName: 'Download Your Information',
+      },
+    ],
     prompts: {
       welcome: "We'll help you safely back up your Facebook history before you go. Your posts, photos, friends, and memories - everything will be preserved in standard formats.",
       authButton: 'Connect Facebook Account',
@@ -129,6 +168,36 @@ const platforms: Platform[] = [
       { id: 'messages', name: 'Messages', description: 'Your InMail and conversations', icon: '💬' },
       { id: 'recommendations', name: 'Recommendations', description: 'Recommendations given and received', icon: '⭐' },
       { id: 'applications', name: 'Job Applications', description: 'Your job application history', icon: '📋' },
+    ],
+    limitationBanners: [
+      {
+        dataTypeId: 'connections',
+        severity: 'warning',
+        message: 'Connection contact details are limited via API. Use LinkedIn\'s official data export for complete connection info.',
+        officialToolUrl: 'https://www.linkedin.com/psettings/member-data',
+        officialToolName: 'Get a copy of your data',
+      },
+      {
+        dataTypeId: 'messages',
+        severity: 'warning',
+        message: 'Message history requires LinkedIn\'s official archive. API access to messages is very limited.',
+        officialToolUrl: 'https://www.linkedin.com/psettings/member-data',
+        officialToolName: 'Get a copy of your data',
+      },
+      {
+        dataTypeId: 'recommendations',
+        severity: 'info',
+        message: 'Recommendation data requires LinkedIn\'s official data export.',
+        officialToolUrl: 'https://www.linkedin.com/psettings/member-data',
+        officialToolName: 'Get a copy of your data',
+      },
+      {
+        dataTypeId: 'applications',
+        severity: 'info',
+        message: 'Job application history is only available through LinkedIn\'s official data export.',
+        officialToolUrl: 'https://www.linkedin.com/psettings/member-data',
+        officialToolName: 'Get a copy of your data',
+      },
     ],
     prompts: {
       welcome: "We'll help you back up your professional history before you go. Your profile, connections, recommendations, and content - preserved for your records.",

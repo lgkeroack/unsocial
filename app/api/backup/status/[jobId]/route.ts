@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { getBackupJobStatus } from '@/lib/queue/backup-jobs';
+import { createErrorResponse } from '@/lib/errors';
 
 interface RouteParams {
   params: Promise<{ jobId: string }>;
@@ -15,46 +16,36 @@ export async function GET(
     const session = await getServerSession(authOptions);
 
     if (!session) {
-      return NextResponse.json(
-        { error: 'Not authenticated' },
-        { status: 401 }
-      );
+      const err = createErrorResponse('AUTH_REQUIRED');
+      return NextResponse.json(err.error, { status: err.status });
     }
 
     const { jobId } = await params;
 
-    // Validate jobId format (should be a number or UUID)
+    // Validate jobId format (accepts cuids, UUIDs, numeric IDs)
     if (!/^[a-zA-Z0-9_-]+$/.test(jobId)) {
-      return NextResponse.json(
-        { error: 'Invalid job ID format' },
-        { status: 400 }
-      );
+      const err = createErrorResponse('INVALID_INPUT', 'Invalid job ID format');
+      return NextResponse.json(err.error, { status: err.status });
     }
 
     const status = await getBackupJobStatus(jobId);
 
     if (!status) {
-      return NextResponse.json(
-        { error: 'Job not found' },
-        { status: 404 }
-      );
+      const err = createErrorResponse('BACKUP_NOT_FOUND');
+      return NextResponse.json(err.error, { status: err.status });
     }
 
     // Verify job belongs to user
     if (status.userId !== session.user.id) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 403 }
-      );
+      const err = createErrorResponse('AUTH_REQUIRED');
+      return NextResponse.json(err.error, { status: err.status });
     }
 
     return NextResponse.json(status);
 
   } catch (error) {
     console.error('Status check error:', error);
-    return NextResponse.json(
-      { error: 'Failed to check status' },
-      { status: 500 }
-    );
+    const err = createErrorResponse('INTERNAL_ERROR');
+    return NextResponse.json(err.error, { status: err.status });
   }
 }

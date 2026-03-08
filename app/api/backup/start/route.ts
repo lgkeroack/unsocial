@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { createBackupJob } from '@/lib/queue/backup-jobs';
+import { createErrorResponse } from '@/lib/errors';
+import { logAudit } from '@/lib/audit';
 
 const VALID_PLATFORMS = ['instagram', 'facebook', 'linkedin'] as const;
 type ValidPlatform = typeof VALID_PLATFORMS[number];
@@ -31,50 +33,38 @@ export async function POST(request: NextRequest) {
     const session = await getServerSession(authOptions);
 
     if (!session || !session.accessToken) {
-      return NextResponse.json(
-        { error: 'Not authenticated. Please log in first.' },
-        { status: 401 }
-      );
+      const err = createErrorResponse('AUTH_REQUIRED');
+      return NextResponse.json(err.error, { status: err.status });
     }
 
     let body: unknown;
     try {
       body = await request.json();
     } catch {
-      return NextResponse.json(
-        { error: 'Invalid JSON body' },
-        { status: 400 }
-      );
+      const err = createErrorResponse('INVALID_INPUT', 'Invalid JSON body');
+      return NextResponse.json(err.error, { status: err.status });
     }
 
     if (typeof body !== 'object' || body === null) {
-      return NextResponse.json(
-        { error: 'Request body must be an object' },
-        { status: 400 }
-      );
+      const err = createErrorResponse('INVALID_INPUT', 'Request body must be an object');
+      return NextResponse.json(err.error, { status: err.status });
     }
 
     const { platform, dataTypes } = body as { platform?: unknown; dataTypes?: unknown };
 
     if (!isValidPlatform(platform)) {
-      return NextResponse.json(
-        { error: 'Invalid platform. Must be one of: instagram, facebook, linkedin' },
-        { status: 400 }
-      );
+      const err = createErrorResponse('INVALID_INPUT', 'Invalid platform. Must be one of: instagram, facebook, linkedin');
+      return NextResponse.json(err.error, { status: err.status });
     }
 
     if (!isValidDataTypes(dataTypes)) {
-      return NextResponse.json(
-        { error: 'Invalid dataTypes. Must be an array of strings' },
-        { status: 400 }
-      );
+      const err = createErrorResponse('INVALID_INPUT', 'Invalid dataTypes. Must be an array of strings');
+      return NextResponse.json(err.error, { status: err.status });
     }
 
     if (!areDataTypesAllowedForPlatform(platform, dataTypes)) {
-      return NextResponse.json(
-        { error: `Invalid dataTypes for ${platform}. Allowed types: ${ALLOWED_DATA_TYPES[platform].join(', ')}` },
-        { status: 400 }
-      );
+      const err = createErrorResponse('INVALID_INPUT', `Invalid dataTypes for ${platform}. Allowed types: ${ALLOWED_DATA_TYPES[platform].join(', ')}`);
+      return NextResponse.json(err.error, { status: err.status });
     }
 
     const jobId = await createBackupJob({
@@ -86,6 +76,13 @@ export async function POST(request: NextRequest) {
       userEmail: session.user.email || undefined
     });
 
+    await logAudit({
+      userId: session.user.id,
+      action: 'backup.started',
+      platform,
+      metadata: { jobId, dataTypes },
+    });
+
     return NextResponse.json({
       success: true,
       jobId,
@@ -94,9 +91,7 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('Backup start error:', error);
-    return NextResponse.json(
-      { error: 'Failed to start backup' },
-      { status: 500 }
-    );
+    const err = createErrorResponse('BACKUP_START_FAILED');
+    return NextResponse.json(err.error, { status: err.status });
   }
 }

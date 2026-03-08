@@ -1,7 +1,9 @@
-import { NextAuthOptions, Account, Profile } from 'next-auth';
+import { NextAuthOptions, Account, Profile, User } from 'next-auth';
+import { PrismaAdapter } from '@auth/prisma-adapter';
 import FacebookProvider from 'next-auth/providers/facebook';
 import LinkedInProvider from 'next-auth/providers/linkedin';
 import { JWT } from 'next-auth/jwt';
+import { prisma } from '@/lib/db';
 
 // Custom Instagram OAuth provider
 const InstagramProvider = (options: { clientId: string; clientSecret: string }) => ({
@@ -35,6 +37,7 @@ const InstagramProvider = (options: { clientId: string; clientSecret: string }) 
 });
 
 export const authOptions: NextAuthOptions = {
+  adapter: PrismaAdapter(prisma) as NextAuthOptions['adapter'],
   providers: [
     InstagramProvider({
       clientId: process.env.NEXT_PUBLIC_META_APP_ID!,
@@ -59,12 +62,18 @@ export const authOptions: NextAuthOptions = {
       }
     })
   ],
+  session: {
+    strategy: 'jwt',
+  },
   callbacks: {
-    async jwt({ token, account }: { token: JWT; account: Account | null; profile?: Profile }) {
+    async jwt({ token, account, user }: { token: JWT; account: Account | null; profile?: Profile; user?: User }) {
       if (account) {
         token.accessToken = account.access_token;
         token.provider = account.provider;
         token.providerAccountId = account.providerAccountId;
+      }
+      if (user) {
+        token.userId = user.id;
       }
       return token;
     },
@@ -72,7 +81,9 @@ export const authOptions: NextAuthOptions = {
       session.accessToken = token.accessToken as string | undefined;
       session.provider = token.provider as string | undefined;
       session.providerAccountId = token.providerAccountId as string | undefined;
-      if (token.providerAccountId) {
+      if (token.userId) {
+        session.user.id = token.userId as string;
+      } else if (token.providerAccountId) {
         session.user.id = token.providerAccountId as string;
       }
       return session;

@@ -20,5 +20,6 @@ declare module 'next-auth/jwt' {
     accessToken?: string;
     provider?: string;
     providerAccountId?: string;
+    userId?: string;
   }
 }

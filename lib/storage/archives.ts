@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, GetObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomUUID } from 'crypto';
 import { PlatformType, PLATFORMS, isValidUUID, sanitizeId } from '@/lib/constants';
@@ -94,6 +94,17 @@ export async function getArchiveDownloadUrl(
         expiresIn: 604800 // 7 days (matches email promise)
       });
 
+      // Increment download count in database (fire-and-forget)
+      try {
+        const { prisma } = await import('@/lib/db');
+        await prisma.archive.updateMany({
+          where: { s3Key: key },
+          data: { downloadCount: { increment: 1 } },
+        });
+      } catch {
+        // Never fail the download due to count tracking
+      }
+
       return signedUrl;
     } catch {
       // File not found in this platform folder, try next
@@ -102,4 +113,23 @@ export async function getArchiveDownloadUrl(
   }
 
   return null;
+}
+
+export async function checkArchiveExists(s3Key: string): Promise<boolean> {
+  const s3Client = getS3Client();
+  const bucket = process.env.STORAGE_BUCKET;
+
+  if (!bucket) {
+    return false;
+  }
+
+  try {
+    await s3Client.send(new HeadObjectCommand({
+      Bucket: bucket,
+      Key: s3Key,
+    }));
+    return true;
+  } catch {
+    return false;
+  }
 }
