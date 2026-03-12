@@ -12,7 +12,8 @@ function getResendClient(): Resend {
 export async function sendBackupCompleteEmail(
   userEmail: string,
   platform: PlatformType,
-  archiveId: string
+  archiveId: string,
+  encryptionPassphrase?: string
 ): Promise<void> {
   const resend = getResendClient();
   const fromEmail = process.env.FROM_EMAIL;
@@ -73,6 +74,14 @@ export async function sendBackupCompleteEmail(
 
               <a href="${downloadUrl}" class="button">Download Your Archive</a>
 
+              ${encryptionPassphrase ? `
+              <div class="warning">
+                <strong>Decryption Passphrase:</strong> <code style="background:#f3f4f6;padding:2px 6px;border-radius:4px;font-size:14px;">${encryptionPassphrase}</code><br>
+                Your backup is encrypted for security. You will need this passphrase to decrypt the archive after downloading.
+                Save this passphrase somewhere safe!
+              </div>
+              ` : ''}
+
               <div class="warning">
                 <strong>Important:</strong> This download link will expire in <strong>7 days</strong>.
                 Make sure to download your backup before then!
@@ -81,6 +90,7 @@ export async function sendBackupCompleteEmail(
               <h3>What's Next?</h3>
               <ol>
                 <li>Download and save your archive to a safe location</li>
+                ${encryptionPassphrase ? '<li>Decrypt the archive using the passphrase above (use the decryption tool on unsocial.me or any AES-256-GCM compatible tool)</li>' : ''}
                 <li>Extract the ZIP file to browse your data</li>
                 <li>Return to unsocial.me to proceed with account deletion (if desired)</li>
               </ol>

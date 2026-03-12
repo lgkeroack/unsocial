@@ -8,6 +8,7 @@ const platforms = [
   { id: 'instagram', name: 'Instagram' },
   { id: 'facebook', name: 'Facebook' },
   { id: 'linkedin', name: 'LinkedIn' },
+  { id: 'tiktok', name: 'TikTok' },
 ];
 
 export default function Home() {

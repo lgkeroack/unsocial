@@ -4,15 +4,17 @@ import { authOptions } from '@/lib/auth';
 import { createBackupJob } from '@/lib/queue/backup-jobs';
 import { createErrorResponse } from '@/lib/errors';
 import { logAudit } from '@/lib/audit';
+import { getClientIp } from '@/lib/ip';
 
-const VALID_PLATFORMS = ['instagram', 'facebook', 'linkedin'] as const;
+const VALID_PLATFORMS = ['instagram', 'facebook', 'linkedin', 'tiktok'] as const;
 type ValidPlatform = typeof VALID_PLATFORMS[number];
 
 // Platform-specific allowed data types
 const ALLOWED_DATA_TYPES: Record<ValidPlatform, string[]> = {
   instagram: ['profile', 'posts', 'stories', 'reels', 'messages', 'followers'],
   facebook: ['profile', 'posts', 'photos', 'videos', 'friends', 'groups', 'events', 'messages'],
-  linkedin: ['profile', 'connections', 'posts', 'messages', 'recommendations', 'applications']
+  linkedin: ['profile', 'connections', 'posts', 'messages', 'recommendations', 'applications'],
+  tiktok: ['profile', 'videos', 'liked_videos', 'followers', 'following'],
 };
 
 function isValidPlatform(platform: unknown): platform is ValidPlatform {
@@ -53,7 +55,7 @@ export async function POST(request: NextRequest) {
     const { platform, dataTypes } = body as { platform?: unknown; dataTypes?: unknown };
 
     if (!isValidPlatform(platform)) {
-      const err = createErrorResponse('INVALID_INPUT', 'Invalid platform. Must be one of: instagram, facebook, linkedin');
+      const err = createErrorResponse('INVALID_INPUT', 'Invalid platform. Must be one of: instagram, facebook, linkedin, tiktok');
       return NextResponse.json(err.error, { status: err.status });
     }
 
@@ -81,6 +83,7 @@ export async function POST(request: NextRequest) {
       action: 'backup.started',
       platform,
       metadata: { jobId, dataTypes },
+      ipAddress: getClientIp(request),
     });
 
     return NextResponse.json({

@@ -5,6 +5,39 @@ import LinkedInProvider from 'next-auth/providers/linkedin';
 import { JWT } from 'next-auth/jwt';
 import { prisma } from '@/lib/db';
 
+// Custom TikTok OAuth provider (TikTok Login Kit v2)
+const TikTokProvider = (options: { clientKey: string; clientSecret: string }) => ({
+  id: 'tiktok',
+  name: 'TikTok',
+  type: 'oauth' as const,
+  authorization: {
+    url: 'https://www.tiktok.com/v2/auth/authorize/',
+    params: {
+      scope: 'user.info.basic,video.list',
+      response_type: 'code',
+      client_key: options.clientKey,
+    }
+  },
+  token: {
+    url: 'https://open.tiktokapis.com/v2/oauth/token/',
+  },
+  userinfo: {
+    url: 'https://open.tiktokapis.com/v2/user/info/',
+    params: { fields: 'open_id,union_id,avatar_url,display_name' }
+  },
+  profile(profile: { data: { user: { open_id: string; display_name: string; avatar_url: string } } }) {
+    const user = profile.data.user;
+    return {
+      id: user.open_id,
+      name: user.display_name,
+      email: null,
+      image: user.avatar_url || null,
+    };
+  },
+  clientId: options.clientKey,
+  clientSecret: options.clientSecret,
+});
+
 // Custom Instagram OAuth provider
 const InstagramProvider = (options: { clientId: string; clientSecret: string }) => ({
   id: 'instagram',
@@ -60,7 +93,11 @@ export const authOptions: NextAuthOptions = {
           scope: 'r_liteprofile r_emailaddress w_member_social'
         }
       }
-    })
+    }),
+    TikTokProvider({
+      clientKey: process.env.TIKTOK_CLIENT_KEY!,
+      clientSecret: process.env.TIKTOK_CLIENT_SECRET!,
+    }),
   ],
   session: {
     strategy: 'jwt',

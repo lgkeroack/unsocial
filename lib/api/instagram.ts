@@ -36,6 +36,8 @@ interface InstagramBackup {
   profile: InstagramUser | null;
   media: InstagramMedia[];
   downloadedFiles: DownloadedFile[];
+  followers: unknown[];
+  followersWarning?: string;
 }
 
 export class InstagramAPI {
@@ -140,11 +142,52 @@ export class InstagramAPI {
   }
 
   /**
-   * Get followers list
-   * Note: This requires Instagram Graph API (business accounts)
+   * Check if the account is a business or creator account
    */
-  async getFollowers(): Promise<unknown[]> {
-    throw new Error('Followers endpoint requires Instagram Graph API with business account');
+  async isBusinessAccount(): Promise<boolean> {
+    try {
+      const profile = await this.getUserProfile();
+      return profile.account_type === 'BUSINESS' || profile.account_type === 'MEDIA_CREATOR';
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Get followers list
+   * Returns followers for business/creator accounts, empty array with warning for personal accounts.
+   */
+  async getFollowers(): Promise<{ data: unknown[]; warning?: string }> {
+    const isBusiness = await this.isBusinessAccount();
+
+    if (!isBusiness) {
+      return {
+        data: [],
+        warning: 'Follower/following lists are only available for Business or Creator accounts. Your personal account data was backed up without follower details.',
+      };
+    }
+
+    try {
+      const profile = await this.getUserProfile();
+      const url = new URL(`${this.baseUrl}/${profile.id}/followers`);
+      url.searchParams.set('access_token', this.accessToken);
+
+      const response = await fetch(url.toString());
+      if (!response.ok) {
+        return {
+          data: [],
+          warning: 'Could not fetch followers. The API may require additional permissions.',
+        };
+      }
+
+      const result = await response.json();
+      return { data: result.data || [] };
+    } catch {
+      return {
+        data: [],
+        warning: 'Failed to fetch followers. This feature requires specific API permissions.',
+      };
+    }
   }
 
   /**
@@ -165,7 +208,8 @@ export class InstagramAPI {
     const backup: InstagramBackup = {
       profile: null,
       media: [],
-      downloadedFiles: []
+      downloadedFiles: [],
+      followers: [],
     };
 
     try {
@@ -174,10 +218,16 @@ export class InstagramAPI {
       backup.profile = await this.getUserProfile();
 
       // Step 2: Get all media
-      if (onProgress) onProgress(30, 'Fetching posts and media...');
+      if (onProgress) onProgress(25, 'Fetching posts and media...');
       backup.media = await this.getUserMedia();
 
-      // Step 3: Download media files
+      // Step 3: Get followers (graceful for personal accounts)
+      if (onProgress) onProgress(40, 'Checking followers...');
+      const followersResult = await this.getFollowers();
+      backup.followers = followersResult.data;
+      backup.followersWarning = followersResult.warning;
+
+      // Step 4: Download media files
       if (onProgress) onProgress(50, 'Downloading media files...');
       const totalMedia = backup.media.length;
 
@@ -235,6 +285,13 @@ export async function createInstagramArchive(backup: InstagramBackup): Promise<B
       name: 'media.json'
     });
 
+    // Add followers data if available
+    if (backup.followers.length > 0) {
+      archive.append(JSON.stringify(backup.followers, null, 2), {
+        name: 'followers.json'
+      });
+    }
+
     // Add downloaded files
     for (const file of backup.downloadedFiles) {
       archive.append(file.data, {
@@ -243,6 +300,10 @@ export async function createInstagramArchive(backup: InstagramBackup): Promise<B
     }
 
     // Add README
+    const followersNote = backup.followersWarning
+      ? `\nNote: ${backup.followersWarning}\n`
+      : `- followers.json: Your followers list\n`;
+
     const readme = `
 # Your Instagram Backup
 
@@ -255,7 +316,7 @@ Total Posts: ${backup.media.length}
 - profile.json: Your profile information
 - media.json: Metadata for all your posts
 - media/: All your photos and videos
-
+${followersNote}
 ## File Format
 
 All files are in standard formats:

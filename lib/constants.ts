@@ -8,13 +8,14 @@ export const PATTERNS = {
   EMAIL: /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/,
 };
 
-export const PLATFORMS = ['instagram', 'facebook', 'linkedin'] as const;
+export const PLATFORMS = ['instagram', 'facebook', 'linkedin', 'tiktok'] as const;
 export type PlatformType = typeof PLATFORMS[number];
 
 export const PLATFORM_NAMES: Record<PlatformType, string> = {
   instagram: 'Instagram',
   facebook: 'Facebook',
   linkedin: 'LinkedIn',
+  tiktok: 'TikTok',
 };
 
 /**

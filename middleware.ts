@@ -1,17 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit';
+import { getClientIp } from '@/lib/ip';
 
 export const config = {
   matcher: '/api/:path*',
 };
-
-function getClientIp(request: NextRequest): string {
-  return (
-    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    request.headers.get('x-real-ip') ||
-    'unknown'
-  );
-}
 
 function getRateLimitConfig(pathname: string): { name: string; config: typeof RATE_LIMITS[keyof typeof RATE_LIMITS] } | null {
   if (pathname.startsWith('/api/backup/start')) {

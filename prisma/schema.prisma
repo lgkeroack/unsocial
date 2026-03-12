@@ -84,15 +84,17 @@ model BackupJob {
 }
 
 model Archive {
-  id            String   @id @default(cuid())
-  userId        String
-  backupJobId   String   @unique
-  platform      String
-  s3Key         String
-  sizeBytes     Int      @default(0)
-  expiresAt     DateTime
-  downloadCount Int      @default(0)
-  createdAt     DateTime @default(now())
+  id             String   @id @default(cuid())
+  userId         String
+  backupJobId    String   @unique
+  platform       String
+  s3Key          String
+  sizeBytes      Int      @default(0)
+  expiresAt      DateTime
+  downloadCount  Int      @default(0)
+  encrypted      Boolean  @default(false)
+  encryptionHint String?
+  createdAt      DateTime @default(now())
 
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   backupJob BackupJob @relation(fields: [backupJobId], references: [id], onDelete: Cascade)

@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { getArchiveDownloadUrl } from '@/lib/storage/archives';
 import { createErrorResponse } from '@/lib/errors';
 import { logAudit } from '@/lib/audit';
+import { getClientIp } from '@/lib/ip';
 
 interface RouteParams {
   params: Promise<{ archiveId: string }>;
@@ -44,6 +45,7 @@ export async function GET(
       userId: session.user.id,
       action: 'archive.downloaded',
       metadata: { archiveId },
+      ipAddress: getClientIp(request),
     });
 
     // Redirect to the signed URL

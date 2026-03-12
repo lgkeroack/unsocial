@@ -2,7 +2,9 @@ import Queue, { Job } from 'bull';
 import { InstagramAPI, createInstagramArchive } from '@/lib/api/instagram';
 import { FacebookAPI, createFacebookArchive } from '@/lib/api/facebook';
 import { LinkedInAPI, createLinkedInArchive } from '@/lib/api/linkedin';
+import { TikTokAPI, createTikTokArchive } from '@/lib/api/tiktok';
 import { uploadArchive } from '@/lib/storage/archives';
+import { encryptBuffer, generatePassphrase } from '@/lib/crypto';
 import { sendBackupCompleteEmail } from '@/lib/email/notifications';
 import { PlatformType } from '@/lib/constants';
 import { prisma } from '@/lib/db';
@@ -102,6 +104,13 @@ async function runBackupForPlatform(
       });
       return createLinkedInArchive(backup);
     }
+    case 'tiktok': {
+      const tiktokAPI = new TikTokAPI(accessToken);
+      const backup = await tiktokAPI.backupAllData(dataTypes, (progress) => {
+        onProgress(progress);
+      });
+      return createTikTokArchive(backup);
+    }
     default:
       throw new Error(`Invalid platform: ${platform}`);
   }
@@ -129,7 +138,13 @@ async function processBackupJob(job: Job<BackupJobData>): Promise<BackupJobResul
     });
 
     await job.progress(95);
-    const archiveId = await uploadArchive(userId, platform, archive);
+
+    // Encrypt archive before upload
+    const passphrase = generatePassphrase();
+    const encryptedArchive = encryptBuffer(archive, passphrase);
+    const encryptionHint = passphrase.slice(-4);
+
+    const archiveId = await uploadArchive(userId, platform, encryptedArchive);
 
     // Create archive record
     const s3Key = `${userId}/${platform}/${archiveId}.zip`;
@@ -139,8 +154,10 @@ async function processBackupJob(job: Job<BackupJobData>): Promise<BackupJobResul
         backupJobId: dbJobId,
         platform,
         s3Key,
-        sizeBytes: archive.length,
+        sizeBytes: encryptedArchive.length,
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+        encrypted: true,
+        encryptionHint,
       },
     }).catch((err) => console.error('Failed to create archive record:', err));
 
@@ -158,7 +175,7 @@ async function processBackupJob(job: Job<BackupJobData>): Promise<BackupJobResul
     });
 
     if (job.data.userEmail) {
-      await sendBackupCompleteEmail(job.data.userEmail, platform, archiveId);
+      await sendBackupCompleteEmail(job.data.userEmail, platform, archiveId, passphrase);
     }
 
     await job.progress(100);
@@ -202,7 +219,12 @@ async function processJobInProcess(dbJobId: string, data: BackupJobData): Promis
       }).catch(() => {});
     });
 
-    const archiveId = await uploadArchive(userId, platform, archive);
+    // Encrypt archive before upload
+    const passphrase = generatePassphrase();
+    const encryptedArchive = encryptBuffer(archive, passphrase);
+    const encryptionHint = passphrase.slice(-4);
+
+    const archiveId = await uploadArchive(userId, platform, encryptedArchive);
 
     const s3Key = `${userId}/${platform}/${archiveId}.zip`;
     await prisma.archive.create({
@@ -211,8 +233,10 @@ async function processJobInProcess(dbJobId: string, data: BackupJobData): Promis
         backupJobId: dbJobId,
         platform,
         s3Key,
-        sizeBytes: archive.length,
+        sizeBytes: encryptedArchive.length,
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        encrypted: true,
+        encryptionHint,
       },
     }).catch((err) => console.error('Failed to create archive record:', err));
 
@@ -229,7 +253,7 @@ async function processJobInProcess(dbJobId: string, data: BackupJobData): Promis
     });
 
     if (data.userEmail) {
-      await sendBackupCompleteEmail(data.userEmail, platform, archiveId);
+      await sendBackupCompleteEmail(data.userEmail, platform, archiveId, passphrase);
     }
   } catch (error) {
     console.error('In-process backup failed:', error);

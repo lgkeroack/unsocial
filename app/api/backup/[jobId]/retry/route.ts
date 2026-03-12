@@ -5,6 +5,7 @@ import { prisma } from '@/lib/db';
 import { createErrorResponse } from '@/lib/errors';
 import { createBackupJob } from '@/lib/queue/backup-jobs';
 import { logAudit } from '@/lib/audit';
+import { getClientIp } from '@/lib/ip';
 import { PlatformType } from '@/lib/constants';
 
 interface RouteParams {
@@ -63,6 +64,7 @@ export async function POST(
       action: 'backup.retried',
       platform: originalJob.platform,
       metadata: { originalJobId: jobId, newJobId },
+      ipAddress: getClientIp(request),
     });
 
     return NextResponse.json({

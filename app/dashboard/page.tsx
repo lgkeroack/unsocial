@@ -419,6 +419,28 @@ function DashboardContent() {
                 Select the data you want to preserve.
               </p>
 
+              {/* LinkedIn: prominent CTA to request official export */}
+              {platform.id === 'linkedin' && (
+                <div className="bg-blue-50 border-2 border-blue-200 rounded-2xl p-6 mb-8">
+                  <p className="font-serif text-blue-900 font-medium mb-2">
+                    Important: Request your official LinkedIn data export
+                  </p>
+                  <p className="font-serif text-sm text-blue-700 mb-4">
+                    LinkedIn&apos;s API provides very limited data. For a complete backup of your connections,
+                    messages, recommendations, and full profile, you should request your official data export.
+                    This takes up to 24 hours, so start now.
+                  </p>
+                  <a
+                    href="https://www.linkedin.com/psettings/member-data"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-block px-6 py-2 bg-blue-600 text-white font-serif text-sm rounded-full hover:bg-blue-700 transition-colors"
+                  >
+                    Request LinkedIn Data Export &rarr;
+                  </a>
+                </div>
+              )}
+
               <div className="space-y-3 mb-10">
                 {platform.dataTypes.map((dataType) => {
                   const banners = platform.limitationBanners.filter(b => b.dataTypeId === dataType.id);
@@ -501,9 +523,17 @@ function DashboardContent() {
                 </a>
               )}
 
-              <div className="bg-sand/50 rounded-2xl p-6 mb-10">
+              <div className="bg-sand/50 rounded-2xl p-6 mb-6">
                 <p className="font-serif text-sm text-stone-600">
                   This link expires in 7 days. Make sure to download before then.
+                </p>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6 mb-10 text-left">
+                <p className="font-serif text-sm text-blue-800 font-medium mb-2">Your backup is encrypted</p>
+                <p className="font-serif text-xs text-blue-700">
+                  For your security, the archive is encrypted with AES-256-GCM. Check your email for the
+                  decryption passphrase. You'll need it to access your data after downloading.
                 </p>
               </div>
 

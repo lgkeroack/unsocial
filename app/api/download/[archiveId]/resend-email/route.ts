@@ -6,6 +6,7 @@ import { createErrorResponse } from '@/lib/errors';
 import { checkArchiveExists } from '@/lib/storage/archives';
 import { sendBackupCompleteEmail } from '@/lib/email/notifications';
 import { logAudit } from '@/lib/audit';
+import { getClientIp } from '@/lib/ip';
 import { PlatformType } from '@/lib/constants';
 
 interface RouteParams {
@@ -67,6 +68,7 @@ export async function POST(
       action: 'archive.email_resent',
       platform: archive.platform,
       metadata: { archiveId },
+      ipAddress: getClientIp(request),
     });
 
     return NextResponse.json({ success: true, message: 'Email sent successfully' });
